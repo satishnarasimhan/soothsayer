@@ -13,3 +13,6 @@ Outcomes
 ------------
 Stock price predictions too far into the future are perilious. The accuracy of the prediction is limited to the immediate future in terms of the timeline.
 However, the same model will be highly accurate when it comes to movements of a cyclical nature.
+
+This program has been done as an exercise to build an LSTM model.
+Ref: https://predictivehacks.com/predict-stock-prices-with-lstm/

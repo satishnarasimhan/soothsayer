@@ -1,0 +1,109 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jun  8 15:34:20 2021
+
+@author: Satish Narasimhan
+
+"""
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+%matplotlib inline  
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.layers import LSTM,Dropout,Dense
+ 
+# Download the data for the specified timeperiod and symbol
+data = yf.download('^NSEBANK',start='2019-06-15', interval='1h',end='2021-06-08',progress=False)[['Close']] 
+data.head()
+  
+data.plot(figsize=(10,10))
+
+# Price considered is Close price for the time interval
+cl = data.Close.astype('float32')
+train = cl[0:int(len(cl)*0.80)]
+scl = MinMaxScaler()
+
+scl.fit(train.values.reshape(-1,1))
+cl =scl.transform(cl.values.reshape(-1,1))
+#Create a function to process the data into lb observations look back slices
+# and create the train test dataset (90-10)
+def processData(data,lb):
+    X,Y = [],[]
+    for i in range(len(data)-lb-1):
+        X.append(data[i:(i+lb),0])
+        Y.append(data[(i+lb),0])
+    return np.array(X),np.array(Y)
+ 
+# We use the first 90% of the observations as a train dataset and test dataset the remainder (10%)
+lb=10
+X,y = processData(cl,lb)
+X_train,X_test = X[:int(X.shape[0]*0.90)],X[int(X.shape[0]*0.90):]
+y_train,y_test = y[:int(y.shape[0]*0.90)],y[int(y.shape[0]*0.90):]
+print(X_train.shape[0],X_train.shape[1])
+print(X_test.shape[0], X_test.shape[1])
+print(y_train.shape[0])
+print(y_test.shape[0])
+
+#Build the model
+#mse - Mean Square Error
+model = Sequential()
+model.add(LSTM(256,input_shape=(lb,1)))
+model.add(Dense(1))
+model.compile(optimizer='adam',loss='mse')
+ 
+#Reshape data for (Sample,Timestep,Features) 
+X_train = X_train.reshape((X_train.shape[0],X_train.shape[1],1))
+X_test = X_test.reshape((X_test.shape[0],X_test.shape[1],1))
+ 
+#Fit model with history to check for overfitting
+history = model.fit(X_train,y_train,epochs=300,validation_data=(X_test,y_test),shuffle=False)
+ 
+model.summary() 
+
+plt.figure(figsize=(12,8))
+Xt = model.predict(X_train)
+plt.plot(scl.inverse_transform(y_train.reshape(-1,1)), label="Actual")
+plt.plot(scl.inverse_transform(Xt), label="Predicted")
+plt.legend()
+plt.title("Train Dataset")
+
+plt.figure(figsize=(12,8))
+Xt = model.predict(X_test)
+plt.plot(scl.inverse_transform(y_test.reshape(-1,1)), label="Actual")
+plt.plot(scl.inverse_transform(Xt), label="Predicted")
+plt.legend()
+plt.title("Test Dataset")
+
+# This section is used to predict upto 250 observations ahead.
+# It will prove the stock market prices cannot be predicted far ahead but only upto the immediate future. This is bacause of the errors involved.
+# However the model will work in periodic series e.g. cosine waves
+# Uncomment if required
+
+
+# def processData(data,lb):
+#     X= []
+#     for i in range(len(data)-lb-1):
+#         X.append(data[i:(i+lb),0])
+#     return np.array(X)
+ 
+# # create the x_test_dummy
+# cl2 =cl.copy()
+# pred = []
+# for i in range(X_test.shape[0]):
+#     cl2[int(X.shape[0]*0.90)+i+lb] = model.predict(X_test)[i]
+#     pred.extend(model.predict(X_test)[i])
+#     X = processData(cl2,lb)
+#     X_train,X_test = X[:int(X.shape[0]*0.90)],X[int(X.shape[0]*0.90):]
+#     X_test = X_test.reshape((X_test.shape[0],X_test.shape[1],1))
+ 
+ 
+ 
+# prediction = scl.inverse_transform(np.array(pred).reshape(-1, 1))
+# plt.figure(figsize=(12,8))
+# plt.plot(scl.inverse_transform(y_test.reshape(-1,1)),  label="Actual")
+# plt.plot(prediction, label="Predicted")
+# plt.legend()
+# plt.title("Test Dataset 250 Obs Ahead")
